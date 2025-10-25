@@ -40,6 +40,8 @@ const basePath = 'LeetCode';
 
 /* Difficulty of most recenty submitted question */
 let difficulty = '';
+/* Difficulty of most recenty submitted question */
+let last_language = '';
 
 /* state of upload for progress */
 let uploadState = { uploading: false };
@@ -102,22 +104,20 @@ function constructGitHubPath(
   useDifficultyFolder,
   useLanguageFolder = false,
 ) {
+  const filePath = problem ? `${problem}/${filename}` : `${filename}`;
   if (useLanguageFolder) {
-    //split the filename to get the extension
-    const fileExtension = filename.split('.').pop();
-    //get the language from the extension
-    const language = getLanguageFromExtension(`.${fileExtension}`);
+    const language = last_language;
     console.log('Language:', language);
     if (language) {
       const path = useDifficultyFolder
-        ? `${language}/${difficulty}/${problem}/${filename}`
-        : `/${language}/${problem}/${filename}`;
+        ? `${language}/${difficulty}/${filePath}`
+        : `${language}/${filePath}`;
       return `https://api.github.com/repos/${hook}/contents/${path}`;
     }
   }
   const path = useDifficultyFolder
-    ? `${basePath}/${difficulty}/${problem}/${filename}`
-    : `${problem}/${filename}`;
+    ? `${basePath}/${difficulty}/${filePath}`
+    : `${filePath}`;
   return `https://api.github.com/repos/${hook}/contents/${path}`;
 }
 
@@ -212,7 +212,6 @@ async function updateReadmeTopicTagsWithProblem(topicTags, problemName) {
   readme = sortTopicsInReadme(readme);
 
   const encodedReadme = btoa(unescape(encodeURIComponent(readme)));
-
   try {
     return await upload(
       leethub_token,
@@ -803,6 +802,21 @@ LeetCodeV1.prototype.getLanguageExtension = function () {
   }
   return null;
 };
+LeetCodeV1.prototype.getLanguage = function () {
+  const tag = [
+    ...document.getElementsByClassName('ant-select-selection-selected-value'),
+    ...document.getElementsByClassName('Select-value-label'),
+  ];
+  if (tag && tag.length > 0) {
+    for (let i = 0; i < tag.length; i += 1) {
+      const elem = tag[i].textContent;
+      if (elem !== undefined && languages[elem] !== undefined) {
+        return elem;
+      }
+    }
+  }
+  return '';
+};
 /* function to get the notes if there is any
  the note should be opened atleast once for this to work
  this is because the dom is populated after data is fetched by opening the note */
@@ -1111,6 +1125,12 @@ LeetCodeV2.prototype.getLanguageExtension = function () {
 
   return languages[lang];
 };
+LeetCodeV2.prototype.getLanguage = function () {
+  if (this.submissionData != null) {
+    return this.submissionData.lang.verboseName;
+  }
+  return '';
+};
 
 LeetCodeV2.prototype.getNotesIfAny = function () {};
 
@@ -1393,7 +1413,8 @@ const loader = (leetCode, suffix) => {
       if (!language) {
         throw new Error('Could not find language');
       }
-
+      last_language = leetCode.getLanguage();
+      
       /* Upload README */
       const updateReadMe = await chrome.storage.local.get('stats').then(({ stats }) => {
         const shaExists = stats?.shas?.[problemName]?.['README.md'] !== undefined;
@@ -1542,22 +1563,24 @@ setTimeout(() => {
 async function appendProblemToReadme(topic, markdownFile, hook, problem) {
   const { useDifficultyFolder = false } = await chrome.storage.local.get('useDifficultyFolder');
   const { useLanguageFolder = false } = await chrome.storage.local.get('useLanguageFolder');
+  const filePath = problem ? `${problem}/` : '';
 
   let path = '';
   if (useLanguageFolder) {
-    const fileExtension = filename.split('.').pop();
-    const language = getLanguageFromExtension(`.${fileExtension}`);
+    const language = last_language;
     console.log('Language:', language);
     if (language) {
-      const path = useDifficultyFolder
-        ? `${language}/${difficulty}/${problem}/${filename}`
-        : `/${language}/${problem}/${filename}`;
-      path = `https://api.github.com/repos/${hook}/contents/${path}`;
+      path = useDifficultyFolder
+        ? `${language}/${difficulty}/${filePath}`
+        : `${language}/${filePath}`;
+    } else {
+      console.log("No language found for problem:", problem);
+      return ''
     }
   } else {
     path = useDifficultyFolder
-    ? `${basePath}/${difficulty}/${problem}/${filename}`
-    : `${problem}/${filename}`;
+    ? `${basePath}/${difficulty}/${filePath}`
+    : `${filePath}`;
   }
 
   const url = `https://github.com/${hook}/tree/main/${path}`;
