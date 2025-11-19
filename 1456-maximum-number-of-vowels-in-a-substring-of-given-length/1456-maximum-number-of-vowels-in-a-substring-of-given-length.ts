@@ -11,7 +11,9 @@ function maxVowels(s: string, k: number): number {
   for (let i = 1; i < s.length; i++) {
     if (vowels.includes(s[i - 1])) count--;
     if (vowels.includes(s[i + k - 1])) count++;
+    if (count === k) return count;
     max = Math.max(max, count);
+    
   }
 
   return max;
